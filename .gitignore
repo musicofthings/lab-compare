@@ -1,0 +1,53 @@
+# ===== Environment & Secrets =====
+.env
+.env.local
+.env.*.local
+dashboard/.env*
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ===== Node =====
+node_modules/
+.next/
+out/
+
+# ===== Raw data & scraping artifacts (large files) =====
+/*.csv
+/*.json
+/*.pdf
+/*.html
+/*.txt
+!requirements.txt
+/apollo_bundle.js
+/neuberg_bundle.js
+/nul
+
+# ===== Scraper scripts (WIP, not core project) =====
+/extract_*.py
+/test_agilus_*.py
+
+# ===== Iterative fix scripts (keep only final consolidated) =====
+scripts/fix_linkage_step*.sql
+scripts/fix_linkage_batched.sql
+scripts/fix_linkage_apollo.sql
+scripts/fix_linkage_names.sql
+scripts/fix_search_function.sql
+
+# ===== IDE & OS =====
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# ===== Claude =====
+.claude/
