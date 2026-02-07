@@ -35,13 +35,19 @@ export default function Home() {
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
-    setSelectedLab(null);
     setLoading(true);
     setSearched(true);
-    const data = await searchTests(query, city || undefined, department || undefined);
-    setResults(data);
+    if (selectedLab) {
+      // Search scoped to the selected lab
+      const data = await getLabTests(selectedLab, city || undefined, query.trim());
+      setResults(data);
+    } else {
+      // Global search across all labs
+      const data = await searchTests(query, city || undefined, department || undefined);
+      setResults(data);
+    }
     setLoading(false);
-  }, [query, city, department]);
+  }, [query, city, department, selectedLab]);
 
   const handleLabFilter = useCallback(async (labSlug: string) => {
     if (selectedLab === labSlug) {
@@ -127,12 +133,9 @@ export default function Home() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search tests... (e.g., CBC, Thyroid Profile, HbA1c)"
+              placeholder={selectedLab ? `Search within ${FILTER_LABS.find((l) => l.slug === selectedLab)?.name}...` : "Search tests... (e.g., CBC, Thyroid Profile, HbA1c)"}
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (selectedLab) setSelectedLab(null);
-              }}
+              onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
@@ -169,10 +172,12 @@ export default function Home() {
 
       {/* Results */}
       <div className="space-y-2">
-        {selectedLab && !loading && (
+        {selectedLab && !loading && results.length > 0 && (
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Tests from {FILTER_LABS.find((l) => l.slug === selectedLab)?.name} ({results.length})
+              {query
+                ? `"${query}" in ${FILTER_LABS.find((l) => l.slug === selectedLab)?.name}`
+                : `Tests from ${FILTER_LABS.find((l) => l.slug === selectedLab)?.name}`} ({results.length})
             </h2>
             <button
               onClick={() => {
@@ -198,7 +203,7 @@ export default function Home() {
         )}
         {selectedLab && results.length === 0 && !loading && (
           <div className="text-center py-12 text-gray-500">
-            No tests found for {FILTER_LABS.find((l) => l.slug === selectedLab)?.name}.
+            No tests found{query ? ` for "${query}"` : ""} in {FILTER_LABS.find((l) => l.slug === selectedLab)?.name}.
           </div>
         )}
         {loading && (

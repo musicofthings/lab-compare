@@ -399,6 +399,7 @@ export async function getDepartments(): Promise<string[]> {
 export async function getLabTests(
   labSlug: string,
   city?: string,
+  searchQuery?: string,
   limit = 50
 ): Promise<SearchResult[]> {
   // Step 1: Get the lab ID from slug
@@ -443,14 +444,18 @@ export async function getLabTests(
 
   const testIds = Object.keys(testPriceMap).map(Number);
 
-  // Step 4: Batch-fetch canonical test names
+  // Step 4: Batch-fetch canonical test names (with optional name filter)
   const nameMap: Record<number, { name: string; department: string | null }> = {};
   for (let i = 0; i < testIds.length; i += 200) {
     const batch = testIds.slice(i, i + 200);
-    const { data: tests } = await supabase
+    let nameQuery = supabase
       .from("canonical_tests")
       .select("id, name, departments(name)")
       .in("id", batch);
+    if (searchQuery) {
+      nameQuery = nameQuery.ilike("name", `%${searchQuery}%`);
+    }
+    const { data: tests } = await nameQuery;
     for (const t of tests || []) {
       const deptRaw = t.departments as unknown;
       const dept = Array.isArray(deptRaw)
