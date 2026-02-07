@@ -84,7 +84,8 @@ export async function searchTests(
   // Merge and return
   return tests.map((t) => {
     const stats = priceMap[t.id];
-    const dept = t.departments as { name: string } | null;
+    const deptRaw = t.departments as unknown;
+    const dept = Array.isArray(deptRaw) ? deptRaw[0] as { name: string } | undefined : deptRaw as { name: string } | null;
     const prices = stats?.prices || [];
     return {
       canonical_test_id: t.id,
@@ -175,7 +176,7 @@ async function fetchLabTestsForLocations(
       .range(offset, offset + pageSize - 1);
 
     if (!page || page.length === 0) break;
-    allRows = allRows.concat(page as Record<string, unknown>[]);
+    allRows = allRows.concat(page as unknown as Record<string, unknown>[]);
     if (page.length < pageSize) break;
     offset += pageSize;
   }
@@ -305,7 +306,6 @@ export async function getAvailabilityMatrix(
       "clinicalchemistry": "Biochemistry",
       "specialchemistry": "Biochemistry",
       "proteinchemistry": "Biochemistry",
-      "serologyimmunology": "Serology",
       "serologyimmunology": "Serology",
       "immunology": "Serology",
       "eiainfectioussection": "Serology",

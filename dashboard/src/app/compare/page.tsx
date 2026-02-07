@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getTestComparison, getTestDetails, getCities } from "@/lib/queries";
 import { LAB_COLORS, LAB_NAMES } from "@/lib/types";
@@ -16,12 +17,9 @@ import {
   Cell,
 } from "recharts";
 
-export default function ComparePage({
-  params,
-}: {
-  params: Promise<{ testId: string }>;
-}) {
-  const { testId } = use(params);
+function CompareContent() {
+  const searchParams = useSearchParams();
+  const testId = searchParams.get("id") || "";
   const [data, setData] = useState<TestComparison[]>([]);
   const [testInfo, setTestInfo] = useState<{ name: string; test_type: string | null } | null>(null);
   const [selectedCity, setSelectedCity] = useState("");
@@ -29,6 +27,7 @@ export default function ComparePage({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!testId) return;
     getCities().then(setCities);
     getTestDetails(Number(testId)).then((info) => {
       if (info) setTestInfo({ name: info.name, test_type: info.test_type });
@@ -36,6 +35,7 @@ export default function ComparePage({
   }, [testId]);
 
   useEffect(() => {
+    if (!testId) return;
     setLoading(true);
     getTestComparison(Number(testId), selectedCity || undefined).then((d) => {
       setData(d);
@@ -47,6 +47,14 @@ export default function ComparePage({
     if (p === null || p === undefined) return "-";
     return `Rs. ${p.toLocaleString("en-IN")}`;
   };
+
+  if (!testId) {
+    return (
+      <div className="text-center py-12 text-gray-500">
+        No test selected. <Link href="/" className="text-blue-600 hover:underline">Go back to search</Link>
+      </div>
+    );
+  }
 
   // Group by lab for chart (average price per lab)
   const labPrices: Record<string, { prices: number[]; slug: string }> = {};
@@ -239,5 +247,13 @@ export default function ComparePage({
         </>
       )}
     </div>
+  );
+}
+
+export default function ComparePage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <CompareContent />
+    </Suspense>
   );
 }

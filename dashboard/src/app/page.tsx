@@ -113,7 +113,7 @@ export default function Home() {
         {results.map((r) => (
           <Link
             key={r.canonical_test_id}
-            href={`/compare/${r.canonical_test_id}`}
+            href={`/compare?id=${r.canonical_test_id}`}
             className="block bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
           >
             <div className="flex items-center justify-between">

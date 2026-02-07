@@ -114,7 +114,7 @@ export default function HeatmapPage() {
                     <tr key={row.canonical_test_id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-4 py-2 sticky left-0 bg-white dark:bg-gray-900">
                         <Link
-                          href={`/compare/${row.canonical_test_id}`}
+                          href={`/compare?id=${row.canonical_test_id}`}
                           className="text-gray-900 dark:text-white hover:text-blue-600 font-medium"
                         >
                           {row.test_name}
