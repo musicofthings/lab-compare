@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { getPriceHeatmap, getCities } from "@/lib/queries";
 import { LAB_COLORS, LAB_NAMES } from "@/lib/types";
 import type { PriceHeatmapEntry } from "@/lib/types";
-
-const LAB_SLUGS = ["metropolis", "agilus", "apollo", "neuberg", "trustlab"];
 
 function getPriceColor(
   price: number | null,
@@ -51,6 +49,20 @@ export default function HeatmapPage() {
     return p.toLocaleString("en-IN");
   };
 
+  // Compute which labs actually have data for this city
+  const activeLabs = useMemo(() => {
+    const labSet = new Set<string>();
+    for (const entry of data) {
+      for (const slug of Object.keys(entry.lab_prices)) {
+        if (entry.lab_prices[slug] !== null) {
+          labSet.add(slug);
+        }
+      }
+    }
+    const preferredOrder = ["metropolis", "agilus", "apollo", "neuberg", "trustlab"];
+    return preferredOrder.filter((slug) => labSet.has(slug));
+  }, [data]);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -86,7 +98,7 @@ export default function HeatmapPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-500 sticky left-0 bg-gray-50 dark:bg-gray-800 min-w-[250px]">
                     Test Name
                   </th>
-                  {LAB_SLUGS.map((slug) => (
+                  {activeLabs.map((slug) => (
                     <th key={slug} className="px-3 py-3 text-center font-medium min-w-[100px]">
                       <div className="flex items-center justify-center gap-1">
                         <span
@@ -121,7 +133,7 @@ export default function HeatmapPage() {
                         </Link>
                         <div className="text-xs text-gray-400">{row.lab_count} labs</div>
                       </td>
-                      {LAB_SLUGS.map((slug) => {
+                      {activeLabs.map((slug) => {
                         const price = row.lab_prices[slug] ?? null;
                         return (
                           <td key={slug} className="px-3 py-2 text-center">

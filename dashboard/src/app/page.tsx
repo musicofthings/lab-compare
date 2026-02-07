@@ -2,9 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { searchTests, getCities, getDepartments, getPopularTests } from "@/lib/queries";
+import { searchTests, getCities, getDepartments, getPopularTests, getLabTests } from "@/lib/queries";
 import { LAB_COLORS, LAB_NAMES } from "@/lib/types";
 import type { SearchResult } from "@/lib/types";
+
+const FILTER_LABS = [
+  { slug: "metropolis", name: "Metropolis", color: "#2563eb" },
+  { slug: "agilus", name: "Agilus", color: "#16a34a" },
+  { slug: "apollo", name: "Apollo", color: "#dc2626" },
+  { slug: "neuberg", name: "Neuberg", color: "#9333ea" },
+];
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -15,6 +22,7 @@ export default function Home() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [selectedLab, setSelectedLab] = useState<string | null>(null);
 
   useEffect(() => {
     getCities().then(setCities);
@@ -27,12 +35,35 @@ export default function Home() {
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
+    setSelectedLab(null);
     setLoading(true);
     setSearched(true);
     const data = await searchTests(query, city || undefined, department || undefined);
     setResults(data);
     setLoading(false);
   }, [query, city, department]);
+
+  const handleLabFilter = useCallback(async (labSlug: string) => {
+    if (selectedLab === labSlug) {
+      // Toggle off: go back to popular tests
+      setSelectedLab(null);
+      setSearched(false);
+      setQuery("");
+      setLoading(true);
+      const data = await getPopularTests();
+      setResults(data);
+      setLoading(false);
+      return;
+    }
+
+    setSelectedLab(labSlug);
+    setQuery("");
+    setSearched(true);
+    setLoading(true);
+    const data = await getLabTests(labSlug, city || undefined);
+    setResults(data);
+    setLoading(false);
+  }, [selectedLab, city]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSearch();
@@ -46,13 +77,48 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
           Compare Diagnostic Test Prices
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
           Search across Metropolis, Agilus, Apollo, Neuberg, and TRUSTlab
         </p>
+      </div>
+
+      {/* Lab Quick-Filter Icons */}
+      <div className="flex justify-center gap-3 mb-6">
+        {FILTER_LABS.map((lab) => (
+          <button
+            key={lab.slug}
+            onClick={() => handleLabFilter(lab.slug)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+              selectedLab === lab.slug
+                ? "border-2 shadow-md scale-105"
+                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:shadow-sm hover:scale-102"
+            }`}
+            style={
+              selectedLab === lab.slug
+                ? {
+                    borderColor: lab.color,
+                    backgroundColor: `${lab.color}15`,
+                    color: lab.color,
+                  }
+                : undefined
+            }
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 opacity-60">
+              <path d="M7 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM14.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM1.615 16.428a1.224 1.224 0 0 1-.569-1.175 6.002 6.002 0 0 1 11.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 0 1 7 18a9.953 9.953 0 0 1-5.385-1.572ZM14.5 16h-.106c.07-.297.088-.611.048-.933a7.47 7.47 0 0 0-1.588-3.755 4.502 4.502 0 0 1 5.874 2.636.818.818 0 0 1-.36.98A7.465 7.465 0 0 1 14.5 16Z" />
+            </svg>
+            <span
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: lab.color }}
+            />
+            <span className={selectedLab === lab.slug ? "" : "text-gray-700 dark:text-gray-300"}>
+              {lab.name}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Search Bar */}
@@ -63,7 +129,10 @@ export default function Home() {
               type="text"
               placeholder="Search tests... (e.g., CBC, Thyroid Profile, HbA1c)"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                if (selectedLab) setSelectedLab(null);
+              }}
               onKeyDown={handleKeyDown}
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
@@ -100,17 +169,42 @@ export default function Home() {
 
       {/* Results */}
       <div className="space-y-2">
-        {!searched && results.length > 0 && (
+        {selectedLab && !loading && (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Tests from {FILTER_LABS.find((l) => l.slug === selectedLab)?.name} ({results.length})
+            </h2>
+            <button
+              onClick={() => {
+                setSelectedLab(null);
+                setSearched(false);
+                getPopularTests().then(setResults);
+              }}
+              className="text-xs text-blue-600 hover:underline cursor-pointer"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+        {!searched && !selectedLab && results.length > 0 && (
           <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
             Popular Tests (available at 3+ labs)
           </h2>
         )}
-        {searched && results.length === 0 && !loading && (
+        {searched && !selectedLab && results.length === 0 && !loading && (
           <div className="text-center py-12 text-gray-500">
             No tests found for &quot;{query}&quot;. Try a different search term.
           </div>
         )}
-        {results.map((r) => (
+        {selectedLab && results.length === 0 && !loading && (
+          <div className="text-center py-12 text-gray-500">
+            No tests found for {FILTER_LABS.find((l) => l.slug === selectedLab)?.name}.
+          </div>
+        )}
+        {loading && (
+          <div className="text-center py-12 text-gray-500">Loading...</div>
+        )}
+        {!loading && results.map((r) => (
           <Link
             key={r.canonical_test_id}
             href={`/compare?id=${r.canonical_test_id}`}

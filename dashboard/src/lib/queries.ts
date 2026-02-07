@@ -396,6 +396,93 @@ export async function getDepartments(): Promise<string[]> {
   return (data || []).map((d) => d.name);
 }
 
+export async function getLabTests(
+  labSlug: string,
+  city?: string,
+  limit = 50
+): Promise<SearchResult[]> {
+  // Step 1: Get the lab ID from slug
+  const { data: labData } = await supabase
+    .from("labs")
+    .select("id")
+    .eq("slug", labSlug)
+    .limit(1);
+
+  if (!labData || labData.length === 0) return [];
+  const labId = labData[0].id;
+
+  // Step 2: Get lab_tests for this lab (with optional city filter)
+  let ltQuery = supabase
+    .from("lab_tests")
+    .select("canonical_test_id, price, lab_location_id")
+    .eq("lab_id", labId)
+    .eq("is_active", true)
+    .gt("price", 0)
+    .not("canonical_test_id", "is", null)
+    .limit(1000);
+
+  if (city) {
+    const locationIds = await getLocationIdsForCity(city);
+    if (locationIds.length > 0) {
+      ltQuery = ltQuery.in("lab_location_id", locationIds);
+    } else {
+      return [];
+    }
+  }
+
+  const { data: labTests } = await ltQuery;
+  if (!labTests || labTests.length === 0) return [];
+
+  // Step 3: Group by canonical_test_id
+  const testPriceMap: Record<number, number[]> = {};
+  for (const lt of labTests) {
+    const ctId = lt.canonical_test_id as number;
+    if (!testPriceMap[ctId]) testPriceMap[ctId] = [];
+    if (lt.price > 0) testPriceMap[ctId].push(lt.price);
+  }
+
+  const testIds = Object.keys(testPriceMap).map(Number);
+
+  // Step 4: Batch-fetch canonical test names
+  const nameMap: Record<number, { name: string; department: string | null }> = {};
+  for (let i = 0; i < testIds.length; i += 200) {
+    const batch = testIds.slice(i, i + 200);
+    const { data: tests } = await supabase
+      .from("canonical_tests")
+      .select("id, name, departments(name)")
+      .in("id", batch);
+    for (const t of tests || []) {
+      const deptRaw = t.departments as unknown;
+      const dept = Array.isArray(deptRaw)
+        ? (deptRaw[0] as { name: string } | undefined)
+        : (deptRaw as { name: string } | null);
+      nameMap[t.id] = { name: t.name, department: dept?.name || null };
+    }
+  }
+
+  // Step 5: Build SearchResult[] sorted by name
+  const results: SearchResult[] = testIds
+    .filter((id) => nameMap[id])
+    .map((id) => {
+      const prices = testPriceMap[id];
+      return {
+        canonical_test_id: id,
+        test_name: nameMap[id].name,
+        department: nameMap[id].department,
+        similarity_score: 1.0,
+        lab_count: 1,
+        min_price: prices.length ? Math.min(...prices) : null,
+        max_price: prices.length ? Math.max(...prices) : null,
+        avg_price: prices.length
+          ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+          : null,
+      };
+    })
+    .sort((a, b) => (a.test_name || "").localeCompare(b.test_name || ""));
+
+  return results.slice(0, limit);
+}
+
 export async function getPopularTests(): Promise<SearchResult[]> {
   const { data, error } = await supabase
     .from("canonical_tests")

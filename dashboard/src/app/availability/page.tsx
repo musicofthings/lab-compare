@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getAvailabilityMatrix, getCities } from "@/lib/queries";
 import { LAB_COLORS, LAB_NAMES } from "@/lib/types";
 import type { AvailabilityEntry } from "@/lib/types";
-
-const LAB_SLUGS = ["metropolis", "agilus", "apollo", "neuberg", "trustlab"];
 
 export default function AvailabilityPage() {
   const [city, setCity] = useState("Delhi");
@@ -38,9 +36,21 @@ export default function AvailabilityPage() {
 
   const departments = Object.keys(matrix).sort();
 
+  // Compute which labs actually have data for this city
+  const activeLabs = useMemo(() => {
+    const labSet = new Set<string>();
+    for (const row of data) {
+      if (row.test_count > 0) {
+        labSet.add(row.lab_slug);
+      }
+    }
+    const preferredOrder = ["metropolis", "agilus", "apollo", "neuberg", "trustlab"];
+    return preferredOrder.filter((slug) => labSet.has(slug));
+  }, [data]);
+
   // Lab totals
   const labTotals: Record<string, number> = {};
-  for (const slug of LAB_SLUGS) {
+  for (const slug of activeLabs) {
     labTotals[slug] = departments.reduce(
       (sum, dept) => sum + (matrix[dept]?.[slug] || 0),
       0
@@ -93,7 +103,7 @@ export default function AvailabilityPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-500 sticky left-0 bg-gray-50 dark:bg-gray-800 min-w-[180px]">
                     Department
                   </th>
-                  {LAB_SLUGS.map((slug) => (
+                  {activeLabs.map((slug) => (
                     <th key={slug} className="px-3 py-3 text-center font-medium min-w-[100px]">
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-1">
@@ -112,7 +122,7 @@ export default function AvailabilityPage() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {departments.map((dept) => {
                   const row = matrix[dept];
-                  const values = LAB_SLUGS.map((s) => row[s] || 0);
+                  const values = activeLabs.map((s) => row[s] || 0);
                   const maxInRow = Math.max(...values, 1);
 
                   return (
@@ -120,7 +130,7 @@ export default function AvailabilityPage() {
                       <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900">
                         {dept}
                       </td>
-                      {LAB_SLUGS.map((slug) => {
+                      {activeLabs.map((slug) => {
                         const count = row[slug] || 0;
                         return (
                           <td key={slug} className="px-3 py-2.5 text-center">
